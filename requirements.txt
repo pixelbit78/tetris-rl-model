@@ -1,0 +1,8 @@
+tqdm
+numpy
+matplotlib
+torch
+flask
+ipython
+pygame
+opencv-python
