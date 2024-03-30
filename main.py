@@ -1,12 +1,13 @@
 import pygame
 import numpy as np
-from tetris_logic import Actions, TetrisGame
+from tetris_game import Actions, TetrisGame
 from tetromino import Tetromino
 import torch, pickle
 from agent import DeepQNetwork
 import cv2, argparse
 
-SPEED = 20  # fps
+SPEED = 60  # fps
+CELL_SIZE = 30  # Pixel size of a grid cell
 
 class TetrisRender:
     def __init__(self, screen_width=700, screen_height=600, model=None, output=None):
@@ -134,7 +135,7 @@ class TetrisRender:
                     pygame.draw.rect(
                         self.screen,
                         tetromino.color,
-                        ((tetromino.x + j) * self.game.CELL_SIZE, (tetromino.y + i) * self.game.CELL_SIZE, self.game.CELL_SIZE, self.game.CELL_SIZE)
+                        ((tetromino.x + j) * CELL_SIZE, (tetromino.y + i) * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                     )
 
     def draw_board(self):
@@ -145,14 +146,14 @@ class TetrisRender:
                     pygame.draw.rect(
                         self.screen,
                         Tetromino.COLORS[cell-1],
-                        (x * self.game.CELL_SIZE, y * self.game.CELL_SIZE, self.game.CELL_SIZE, self.game.CELL_SIZE)
+                        (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                     )
 
         # draw grid border
         pygame.draw.rect(
             self.screen,
             (255, 255, 255),
-            (0, 0, self.game.grid_size[0] * self.game.CELL_SIZE, self.game.grid_size[1] * self.game.CELL_SIZE),
+            (0, 0, self.game.grid_size[0] * CELL_SIZE, self.game.grid_size[1] * CELL_SIZE),
             2
         )
 
@@ -176,7 +177,7 @@ class TetrisRender:
                     pygame.draw.rect(
                         self.screen,
                         self.game.next_tetromino.color,
-                        ((base_x + j * self.game.CELL_SIZE), (base_y + i * self.game.CELL_SIZE), self.game.CELL_SIZE, self.game.CELL_SIZE)
+                        ((base_x + j * CELL_SIZE), (base_y + i * CELL_SIZE), CELL_SIZE, CELL_SIZE)
                     )
 
         # Optional: Add text label for the next Tetromino

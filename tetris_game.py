@@ -1,4 +1,4 @@
-# tetris_logic.py
+# tetris_game.py
 from tetromino import Tetromino
 import random
 from enum import Enum, auto
@@ -14,68 +14,53 @@ class Actions(Enum):
     IDLE = auto()
 
 class TetrisGame:
-    CELL_SIZE = 30  # Pixel size of a grid cell
     def __init__(self):
         self.grid_size = (10, 20)  # Dimensions for the game grid
+        self.current_tetromino = None
+        self.next_tetromino = None
+        self.grid = None
+        self.nb_actions = 1
+        self.high_score = self.read_high_score()
+        self.action = Actions.IDLE
+        self.restart_game()
+
+    def restart_game(self):
         self.current_tetromino = Tetromino(self.grid_size[0] // 2, 0)
         self.next_tetromino = Tetromino(self.grid_size[0] // 2, 0)
         self.grid = [[0 for _ in range(self.grid_size[0])] for _ in range(self.grid_size[1])]
-        self.drop_speed = 1000  # Tetromino drop speed in milliseconds
-        self.nb_actions = 1
-        self.last_drop_time = 0
-        self.score = 0  # Initialize score
-        self.total_lines_cleared = 0
+        self.score = 0
+        self.level = 0
         self.lines_cleared = 0
+        self.total_lines_cleared = 0
         self.simulated_lines_cleared = 0
         self.paused = False
-        self.high_score = self.read_high_score()
-        self.level = 0
-        self.cells_filled = 0
-        self.steps_taken = 0  # Initialize step counter
+        self.steps_taken = 0
         self.action = Actions.IDLE
-        self.update_drop_speed()  # Update this method to adjust speed based on level
+        self.update_drop_speed()
         self.spawn_new_tetromino()
-        self.restart_game()
+        return self.get_state()
 
-    def get_row_transition(self, area, highest_peak):
-        sum = 0
-        # From highest peak to bottom
-        for row in range(int(len(area) - highest_peak), len(area)):
-            for col in range(1, len(area[0])):
-                if area[row][col] != area[row][col - 1]:
-                    sum += 1
-        return sum
+    def get_state(self, grid=None):
+        """
+        Extracts and returns features from the current game state.
 
+        Returns:
+        - tuple: A tuple of state features (total_height, holes, bumpiness, complete_lines).
+        """
+        simulated = grid is not None
+        lines_cleared = self.simulated_lines_cleared if simulated else self.lines_cleared
+        grid = grid if simulated else self.grid
 
-    def get_col_transition(self, area, peaks):
-        sum = 0
-        for col in range(len(area[0])):
-            if peaks[col] <= 1:
-                continue
-            for row in range(int(len(area) - peaks[col]), len(area) - 1):
-                if area[row][col] != area[row + 1][col]:
-                    sum += 1
-        return sum
+        # Calculate the total height of the stack
+        total_height = sum(self.column_heights(grid))
 
-    def get_wells(self, peaks):
-        wells = []
-        for i in range(len(peaks)):
-            if i == 0:
-                w = peaks[1] - peaks[0]
-                w = w if w > 0 else 0
-                wells.append(w)
-            elif i == len(peaks) - 1:
-                w = peaks[-2] - peaks[-1]
-                w = w if w > 0 else 0
-                wells.append(w)
-            else:
-                w1 = peaks[i - 1] - peaks[i]
-                w2 = peaks[i + 1] - peaks[i]
-                w1 = w1 if w1 > 0 else 0
-                w2 = w2 if w2 > 0 else 0
-                w = w1 if w1 >= w2 else w2
-                wells.append(w)
-        return wells
+        # Calculate the number of holes
+        n_holes = sum(self.count_holes(grid))
+
+        # Calculate the bumpiness
+        bumpiness = self.calculate_bumpiness(grid)
+
+        return (total_height, n_holes, bumpiness, lines_cleared)
 
     def get_next_states(self):
         simulated_game = self
@@ -105,7 +90,7 @@ class TetrisGame:
                 simulated_game.clear_lines(grid)
 
                 # Evaluate the simulated game state
-                state_features = simulated_game.get_state_features(grid)
+                state_features = simulated_game.get_state(grid)
 
                 # append possible move
                 possible_moves[(r, shape_x - x if x < shape_x else 0, x - shape_x if x > shape_x else 0, 1)] = state_features
@@ -125,128 +110,6 @@ class TetrisGame:
 
         return possible_moves
 
-    def explore(self, weights, model):
-        simulated_game = self
-        best_score = -float('inf')
-        best_action = {Actions.ROTATE: 0, Actions.LEFT: 0, Actions.RIGHT: 0, Actions.PLACE: 0}
-        shape_x = simulated_game.current_tetromino.x
-        shape_y = simulated_game.current_tetromino.y
-        shape_orientation = simulated_game.current_tetromino.orientation
-        shape = simulated_game.current_tetromino.shape
-        cnt_moves = 0
-        possible_moves = []
-
-        # find positions
-        for r in range(0, simulated_game.current_tetromino.max_rotations):
-            for x in range(0, simulated_game.grid_size[0]):
-                # move all the way left
-                while simulated_game.current_tetromino.can_move(simulated_game.grid, -1, 0):
-                    simulated_game.perform_action(Actions.LEFT)
-
-                # move right
-                for mx in range(x):
-                    simulated_game.perform_action(Actions.RIGHT)
-
-                # place peice
-                simulated_game.perform_action(Actions.PLACE)
-
-                # append possible move
-                possible_moves.append({Actions.ROTATE: r,
-                                           Actions.LEFT: shape_x - x if x < shape_x else 0,
-                                           Actions.RIGHT: x - shape_x if x > shape_x else 0,
-                                           Actions.PLACE: 1})
-
-                # reset position
-                simulated_game.current_tetromino.x = shape_x
-                simulated_game.current_tetromino.y = shape_y
-
-            simulated_game.perform_action(Actions.ROTATE)
-
-        # evaluate possible moves
-        for move in possible_moves:
-            for action, value in move.items():
-                for _ in range(value):
-                    simulated_game.perform_action(action)
-                    cnt_moves += 1
-                    if action == Actions.PLACE:
-                        break
-
-            # check cleared lines
-            grid = simulated_game.grid_clone()
-            simulated_game.place_tetromino(grid)
-            simulated_game.clear_lines(grid)
-
-            # Evaluate the simulated game state
-            state_features = simulated_game.get_state_features(grid)
-            if weights is None:
-                score = model.activate(state_features)[0]
-            else:
-                score = sum(weight * feature for weight, feature in zip(weights, state_features))
-
-            if score > best_score:
-                best_score = score
-                best_action = move
-
-            # reset position
-            simulated_game.current_tetromino.x = shape_x
-            simulated_game.current_tetromino.y = shape_y
-            simulated_game.current_tetromino.orientation = shape_orientation
-            simulated_game.current_tetromino.shape = shape
-
-        return best_action, cnt_moves, [value for _, value in best_action.items()]
-
-    def get_state_features(self, grid=None):
-        """
-        Extracts and returns features from the current game state.
-
-        Returns:
-        - tuple: A tuple of state features (total_height, complete_lines, holes, bumpiness).
-        """
-        simulated = grid is not None
-        lines_cleared = self.simulated_lines_cleared if simulated else self.lines_cleared
-        grid = grid if simulated else self.grid
-
-        # Calculate the total height of the stack
-        heights = self.column_heights(grid)
-        highest_peak = max(heights)
-        total_height = sum(heights)
-
-        # Calculate the number of holes
-        holes = self.count_holes(grid)
-        n_holes = sum(holes)
-        n_cols_with_holes = np.count_nonzero(np.array(holes) > 0)
-
-        # Calculate the bumpiness
-        bumpiness = self.calculate_bumpiness(grid)
-
-        # Row transitions
-        row_transitions = self.get_row_transition(grid, highest_peak)
-
-        # Columns transitions
-        col_transitions = self.get_col_transition(grid, heights)
-
-        # Number of cols with zero blocks
-        num_pits = np.count_nonzero(np.count_nonzero(grid, axis=0) == 0)
-
-        wells = self.get_wells(heights)
-        # Deepest well
-        max_wells = np.max(wells)
-
-        # You might also want to include the number of complete lines as a feature,
-        # but since that's only updated when lines are cleared, it may not be as
-        # dynamic or useful for decision-making in every step. Alternatively, you
-        # could simulate the next move and assess its impact on line clearance,
-        # but that would be more complex and computationally expensive.
-
-        # For simplicity, we'll skip the complete lines in this example and focus
-        # on the metrics that can be directly calculated from the current state.
-        return (total_height, n_holes, bumpiness, lines_cleared)
-    #, num_pits, max_wells, \
-     #       n_cols_with_holes, self.current_tetromino.orientation, self.current_tetromino.x, self.current_tetromino.y)
-
-    def get_state(self):
-        return self.get_state_features()
-
     def train_step(self, moves):
         moves = moves or {Actions.IDLE: 0}
         new_moves = {}
@@ -264,7 +127,7 @@ class TetrisGame:
         holes = sum(self.count_holes(self.grid))
         bumpiness = self.calculate_bumpiness(self.grid)
 
-        #if self.steps_taken % 10 == 0 and not self.paused:
+        #if self.steps_taken % self.drop_speed == 0 and not self.paused:
         #    reward = 0
         #    self.perform_action(Actions.DROP)
         #elif not self.paused:
@@ -311,20 +174,20 @@ class TetrisGame:
             self.update_high_score()
 
         # return game over and score
-        return self.get_state_features(), reward, done, truncated
+        return self.get_state(), reward, done, truncated
 
     def step(self, moves):
         moves = moves or {Actions.IDLE: 0}
         self.steps_taken += 1
 
-        if self.steps_taken % 10 == 0 and not self.paused:
+        if self.steps_taken % self.drop_speed == 0 and not self.paused:
             self.perform_action(Actions.DROP)
 
         for action, value in moves.items():
             self.perform_action(action, value)
 
         # return game over and score
-        return self.get_state_features()
+        return self.get_state()
 
     def get_score(self):
         return self.score
@@ -383,14 +246,6 @@ class TetrisGame:
             if not self.paused and self.current_tetromino.can_rotate(self.grid):
                 self.current_tetromino.rotate()
 
-    def update_game_state(self):
-        # Drop Tetromino
-        if not self.current_tetromino.can_move(self.grid, 0, 1):
-            self.place_tetromino()
-            self.clear_lines()
-        else:
-            self.perform_action(Actions.DROP)
-
     def place_tetromino(self, grid=None):
         if not self.current_tetromino.can_move(self.grid, 0, 1) and not self.paused:
             grid = grid or self.grid
@@ -405,6 +260,7 @@ class TetrisGame:
         if not self.current_tetromino.can_move(self.grid, 0, 1) and not self.paused:
             simulated = grid is not None
             grid = grid or self.grid
+
             # Remove completed lines and update score
             new_grid = [row for row in grid if not all(row)]
             lines_cleared = len(grid) - len(new_grid)
@@ -428,50 +284,20 @@ class TetrisGame:
         return scores.get(lines_cleared, 0) * (self.level + 1)
 
     def update_level(self):
-        self.level = self.get_score() // 500
+        self.level = self.total_lines_cleared // 10
         self.update_drop_speed()
 
     def update_drop_speed(self):
         # Adjust speed based on level; these values can be tweaked
-        speeds = [800, 720, 630, 550, 470, 380, 300, 220, 130, 100, 80]  # Example speeds
+        speeds = [60, 50, 45, 40, 35, 30, 25, 20, 10, 5, 1]  # Example speeds
         self.drop_speed = speeds[min(self.level, len(speeds) - 1)]
 
     def check_game_over(self):
         # Check if the top row of the grid has any blocks
         return any(cell for cell in self.grid[0])
 
-    def restart_game(self):
-        self.current_tetromino = Tetromino(self.grid_size[0] // 2, 0)
-        self.next_tetromino = Tetromino(self.grid_size[0] // 2, 0)
-        self.grid = [[0 for _ in range(self.grid_size[0])] for _ in range(self.grid_size[1])]
-        self.score = 0
-        self.level = 0
-        self.lines_cleared = 0
-        self.total_lines_cleared = 0
-        self.simulated_lines_cleared = 0
-        self.paused = False
-        self.steps_taken = 0
-        self.cells_filled = 0
-        self.action = Actions.IDLE
-        self.update_drop_speed()
-        return self.get_state()
-
     def toggle_pause(self):
         self.paused = not self.paused
-
-    def tetromino_to_vector(self, tetromino):
-        # Use the type ID to create a type vector directly
-        type_vector = [0] * len(Tetromino.SHAPES)
-        type_vector[tetromino.id-1] = 1
-
-        # Encode the orientation
-        orientation_vector = [0] * 4  # Assuming 4 orientations
-        orientation_vector[tetromino.orientation] = 1
-
-        # Normalize positions
-        position_vector = [tetromino.x, tetromino.y]
-
-        return type_vector + orientation_vector + position_vector
 
     def column_heights(self, grid):
         heights = [0] * len(grid[0])  # Initialize heights for each column
@@ -497,19 +323,8 @@ class TetrisGame:
                     filled_found = True
                 elif filled_found and cell == 0:
                     holes[col] += 1
+
         return holes
 
     def grid_clone(self):
         return [row[:] for row in self.grid]
-
-    def count_holes_diff(self, old_holes, new_holes):
-        old_count = sum(old_holes)
-        new_count = sum(new_holes)
-
-        return new_count - old_count
-
-    def calculate_bumpiness_reward(self, new_bumpiness):
-        bumpiness_reward = 0
-        if new_bumpiness > 0:
-            bumpiness_reward = max(0, 10 - new_bumpiness)  # Example scaling factor
-        return bumpiness_reward
