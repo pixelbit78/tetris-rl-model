@@ -60,7 +60,7 @@ class TetrisGame:
         # Calculate the bumpiness
         bumpiness = self.calculate_bumpiness(grid)
 
-        return (total_height, n_holes, bumpiness, lines_cleared)
+        return (total_height, n_holes, bumpiness)
 
     def get_next_states(self):
         simulated_game = self
@@ -120,18 +120,10 @@ class TetrisGame:
 
         self.steps_taken += 1
         self.lines_cleared = 0
-        truncated = (self.score > 10_000)
-        reward = 0 #self.steps_taken * increment_reward
+        truncated = False
+        reward = 0
         done = False
 
-        holes = sum(self.count_holes(self.grid))
-        bumpiness = self.calculate_bumpiness(self.grid)
-
-        #if self.steps_taken % self.drop_speed == 0 and not self.paused:
-        #    reward = 0
-        #    self.perform_action(Actions.DROP)
-        #elif not self.paused:
-        reward = 0
         for action, value in moves.items():
             self.perform_action(action, value)
 
@@ -141,37 +133,13 @@ class TetrisGame:
             self.total_lines_cleared += lines_cleared
             done = self.check_game_over()
 
-            #if self.is_tetromino_adjacent_to_shape():
-            #    reward = 10
-            if self.calculate_bumpiness(self.grid) <= 2:
-                reward = 10
-            if sum(self.count_holes(self.grid)) <= holes and self.calculate_bumpiness(self.grid) <= bumpiness:
-                reward += 10
-            elif self.calculate_bumpiness(self.grid) <= bumpiness:
-                reward += 5
-            elif sum(self.count_holes(self.grid)) <= holes:
-                reward += 5
-            elif self.calculate_bumpiness(self.grid) > bumpiness:
-                reward -= 5
-            elif sum(self.count_holes(self.grid)) > holes:
-                reward -= 5
-            #elif self.calculate_well_setup_reward() > 0:
-            #    reward = 1
-
-            reward += 1 + (lines_cleared ** 2) * self.grid_size[0]
-            #if self.is_tetromino_adjacent_to_shape():
-            #    reward += self.calculate_partial_line_clear_reward()
-            #reward += self.steps_taken * increment_reward
-            #reward += int(self.is_tetromino_adjacent_to_shape()) * 2
-            #if self.current_tetromino.y >= 16 or sum(self.count_holes(self.grid)) < 2:
-            #    reward += 1
-            #reward += sum(self.count_holes(self.grid)) * -increment_reward
-            #reward += self.calculate_bumpiness(self.grid) * -increment_reward
+            reward = 1 + (lines_cleared ** 2) * self.grid_size[0]
 
         if not done:
             self.spawn_new_tetromino()
         else:
             self.update_high_score()
+            reward = -10
 
         # return game over and score
         return self.get_state(), reward, done, truncated

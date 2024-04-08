@@ -13,10 +13,26 @@
             "args": "${command:pickArgs}"
         },
         {
-            "name": "ai play",
+            "name": "ai play checkpoint",
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
+            "console": "integratedTerminal",
+            "args": "--model model/checkpoint.pth"
+        },
+        {
+            "name": "ai play best",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "main.py",
+            "console": "integratedTerminal",
+            "args": "--model model/best-model.pth"
+        },
+        {
+            "name": "train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train.py",
             "console": "integratedTerminal",
             "args": "--model model/model.pth"
         }
