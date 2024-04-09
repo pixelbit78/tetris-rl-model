@@ -124,6 +124,9 @@ class TetrisGame:
         reward = 0
         done = False
 
+        if self.steps_taken % self.drop_speed == 0 and not self.paused:
+            self.perform_action(Actions.DROP)
+
         for action, value in moves.items():
             self.perform_action(action, value)
 
@@ -139,7 +142,6 @@ class TetrisGame:
             self.spawn_new_tetromino()
         else:
             self.update_high_score()
-            reward = -10
 
         # return game over and score
         return self.get_state(), reward, done, truncated

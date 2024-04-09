@@ -8,16 +8,16 @@ import numpy as np
 import pickle
 from replay_memory import ReplayMemory, Transition
 
-MAX_MEMORY = 100_000
-MAX_SEED = 10_000
+MAX_MEMORY = 10_000
+MAX_SEED = 0
 LR = 1e-3
-BATCH_SIZE = 64
+BATCH_SIZE = 512
 GAMMA = 0.99
-EPS_START = 1
-EPS_END = 0.01
+EPS_START = 0
+EPS_END = 0.00
 EPS_DECAY = 300
 LOG_EVERY_EPISODE = 10
-EPISODES = 1000
+EPISODES = 500
 SAVE_EVERY_EPISODE = 10
 CHECKPOINT_FILE = 'checkpoint.pth'
 BEST_MODEL_FILE = 'best-model.pth'
