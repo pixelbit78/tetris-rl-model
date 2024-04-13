@@ -8,16 +8,16 @@ import numpy as np
 import pickle
 from replay_memory import ReplayMemory, Transition
 
-MAX_MEMORY = 10_000
+MAX_MEMORY = 50_000
 MAX_SEED = 0
-LR = 1e-3
-BATCH_SIZE = 512
+LR = 0.001
+BATCH_SIZE = 64
 GAMMA = 0.99
 EPS_START = 0
 EPS_END = 0.00
 EPS_DECAY = 300
-LOG_EVERY_EPISODE = 10
-EPISODES = 500
+LOG_EVERY_EPISODE = 1
+EPISODES = 250
 SAVE_EVERY_EPISODE = 10
 CHECKPOINT_FILE = 'checkpoint.pth'
 BEST_MODEL_FILE = 'best-model.pth'
@@ -124,7 +124,6 @@ class TetrisAgent():
         return ep_rewards
 
     def train(self):
-        state = None
         num_episode = 0
         episode_totals = []
         reward_record = 0
@@ -173,6 +172,7 @@ class TetrisAgent():
                 avg_steps = []
                 avg_rewards = []
                 max_score = 0
+                min_score = 0
 
         self.plot_rewards_func(show_result=True, totals=episode_totals)
 

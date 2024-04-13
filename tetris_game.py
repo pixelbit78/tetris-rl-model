@@ -48,7 +48,6 @@ class TetrisGame:
         - tuple: A tuple of state features (total_height, holes, bumpiness, complete_lines).
         """
         simulated = grid is not None
-        lines_cleared = self.simulated_lines_cleared if simulated else self.lines_cleared
         grid = grid if simulated else self.grid
 
         # Calculate the total height of the stack
@@ -60,7 +59,10 @@ class TetrisGame:
         # Calculate the bumpiness
         bumpiness = self.calculate_bumpiness(grid)
 
-        return (total_height, n_holes, bumpiness)
+        # Calculate the wells
+        wells = self.count_wells(grid)
+
+        return (total_height, n_holes, bumpiness, wells)
 
     def get_next_states(self):
         simulated_game = self
@@ -295,6 +297,18 @@ class TetrisGame:
                     holes[col] += 1
 
         return holes
+
+    def count_wells(self, grid):
+        heights = self.column_heights(grid)
+        wells = 0
+        for col in range(len(heights)):
+            prev = heights[col+1] if col == 0 else heights[col-1]
+            curr = heights[col]
+            next = heights[col-1] if col == len(heights) - 1 else heights[col+1]
+            if curr < next and curr < prev:
+                wells += (min(prev, next) - curr)
+
+        return wells
 
     def grid_clone(self):
         return [row[:] for row in self.grid]

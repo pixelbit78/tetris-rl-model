@@ -31,8 +31,8 @@ class Tetromino:
     # Define max rotations for each shape
     MAX_ROTATIONS = [2, 4, 2, 2, 1, 4, 4]
 
-    def __init__(self, x, y):
-        self.id = random.randint(1, len(Tetromino.SHAPES))  # Assign a unique type ID
+    def __init__(self, x, y, id=None):
+        self.id = id if id else random.randint(1, len(Tetromino.SHAPES))  # Assign a unique type ID
         self.shape = Tetromino.SHAPES[self.id-1]
         self.color = Tetromino.COLORS[self.id-1]
         self.x = x
@@ -48,7 +48,7 @@ class Tetromino:
         clone.orientation = self.orientation
         clone.max_rotations = self.max_rotations
         return clone
-    
+
     def move(self, dx, dy):
         self.x += dx
         self.y += dy
@@ -81,12 +81,12 @@ class Tetromino:
                 if cell:
                     new_x = self.x + j
                     new_y = self.y + i
-                    if new_x < 0 or new_x >= len(grid[0]) or new_y < 0 or new_y >= len(grid):                   
+                    if new_x < 0 or new_x >= len(grid[0]) or new_y < 0 or new_y >= len(grid):
                         return False
                     if grid[new_y][new_x]:
                         return False
         return True
-    
+
     def get_positions(self):
         positions = []
         for i, row in enumerate(self.shape):

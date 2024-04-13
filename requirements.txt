@@ -6,3 +6,4 @@ flask
 ipython
 pygame
 opencv-python
+pytest
